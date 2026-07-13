@@ -35,6 +35,10 @@ Hover over a survivor, lower the **winch**, reel them in, then land on the red *
 - **Low-poly world** — procedural heightfield terrain (beach, grass, rock, snow), a flat-shaded city, trees, all generated from a seeded RNG so the map is stable.
 - **Audio** — fully procedural rotor whomp + engine hum via WebAudio (no assets).
 
+## Versioning
+
+The game version lives in [`src/version.js`](src/version.js) (semver) and is displayed in the top-right corner of the game and on the start screen. Bump it with every merged change: **patch** for fixes/tuning, **minor** for new features, **major** for breaking overhauls.
+
 ## Tech
 
 Plain ES modules + [Three.js](https://threejs.org) (vendored in `vendor/`). No bundler, no dependencies to install.
@@ -51,4 +55,5 @@ src/survivors.js  rescue targets & their habitats
 src/controls.js   dual virtual joysticks + keyboard
 src/hud.js        gauges & messages
 src/audio.js      procedural rotor sound
+src/version.js    game version (semver, shown on screen)
 ```

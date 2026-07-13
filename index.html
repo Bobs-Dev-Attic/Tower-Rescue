@@ -32,6 +32,8 @@
     text-align:center; text-shadow:0 2px 8px #000; background:none; border:none; opacity:0; transition:opacity .4s; }
   #objective { bottom:calc(env(safe-area-inset-bottom,0px) + 150px); left:50%; transform:translateX(-50%);
     font-size:12px; opacity:.9; text-align:center; }
+  #version { position:fixed; top:calc(env(safe-area-inset-top,0px) + 8px); right:8px; font-size:10px;
+    letter-spacing:1px; color:rgba(200,225,255,.55); pointer-events:none; z-index:5; }
 
   /* ---------- Touch controls ---------- */
   .stick { position:fixed; bottom:calc(env(safe-area-inset-bottom,0px) + 24px); width:124px; height:124px;
@@ -60,6 +62,7 @@
 </head>
 <body>
 <div id="game"></div>
+<div id="version"></div>
 
 <div id="hud">
   <div id="topbar" class="panel">
@@ -90,7 +93,7 @@
      Land on the base pad to refuel &amp; repair. Mind the wind, the waves and the collapsing towers.<br>
      <small>Keyboard: WASD move · Q/E turn · R/F climb · Space winch</small></p>
   <button id="btnStart">TAKE OFF</button>
-  <small>low-poly · dynamic fire · collapsing buildings · ocean physics</small>
+  <small>low-poly · dynamic fire · collapsing buildings · ocean physics · <span id="startVersion"></span></small>
 </div>
 
 <script type="module" src="./src/main.js"></script>

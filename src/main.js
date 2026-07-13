@@ -9,6 +9,10 @@ import { Helicopter } from './heli.js';
 import { HUD } from './hud.js';
 import { RotorAudio } from './audio.js';
 import { clamp } from './util.js';
+import { VERSION } from './version.js';
+
+document.getElementById('version').textContent = 'v' + VERSION;
+document.getElementById('startVersion').textContent = 'v' + VERSION;
 
 // ---------- renderer / scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
