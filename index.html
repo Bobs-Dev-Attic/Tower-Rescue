@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tower Rescue — Helicopter Simulator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#0b1526; touch-action:none;
+    font-family:-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; user-select:none; -webkit-user-select:none; }
+  #game { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; color:#eaf4ff; }
+  .panel { position:absolute; background:rgba(8,18,32,.55); border:1px solid rgba(140,190,255,.25);
+    border-radius:10px; padding:6px 10px; backdrop-filter:blur(4px); font-size:13px; line-height:1.5; }
+  #topbar { top:calc(env(safe-area-inset-top, 0px) + 8px); left:50%; transform:translateX(-50%);
+    display:flex; gap:14px; white-space:nowrap; font-weight:600; }
+  #topbar b { color:#ffd76a; }
+  #gauges { top:calc(env(safe-area-inset-top, 0px) + 8px); left:8px; width:130px; }
+  .bar { height:7px; border-radius:4px; background:rgba(255,255,255,.15); margin:3px 0 7px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:4px; transition:width .15s linear; }
+  #fuelbar i { background:linear-gradient(90deg,#ffb347,#ffd76a); }
+  #hullbar i { background:linear-gradient(90deg,#ff5f6d,#ff9966); }
+  #windrow { display:flex; align-items:center; gap:6px; }
+  #windarrow { display:inline-block; transition:transform .3s; font-size:16px; }
+  #msg { top:22%; left:50%; transform:translate(-50%,-50%); font-size:clamp(16px,4.5vw,26px); font-weight:700;
+    text-align:center; text-shadow:0 2px 8px #000; background:none; border:none; opacity:0; transition:opacity .4s; }
+  #objective { bottom:calc(env(safe-area-inset-bottom,0px) + 150px); left:50%; transform:translateX(-50%);
+    font-size:12px; opacity:.9; text-align:center; }
+
+  /* ---------- Touch controls ---------- */
+  .stick { position:fixed; bottom:calc(env(safe-area-inset-bottom,0px) + 24px); width:124px; height:124px;
+    border-radius:50%; background:rgba(120,170,255,.08); border:2px solid rgba(140,190,255,.35); pointer-events:auto; }
+  .stick .nub { position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px;
+    border-radius:50%; background:rgba(160,205,255,.35); border:2px solid rgba(200,225,255,.7); }
+  .stick .lbl { position:absolute; width:100%; text-align:center; top:-20px; font-size:10px; letter-spacing:1px;
+    color:rgba(200,225,255,.75); }
+  #stickL { left:20px; }
+  #stickR { right:20px; }
+  #btnWinch { position:fixed; right:36px; bottom:calc(env(safe-area-inset-bottom,0px) + 168px); width:78px; height:46px;
+    border-radius:24px; background:rgba(255,200,80,.18); border:2px solid rgba(255,215,120,.6); color:#ffe9b0;
+    font-size:12px; font-weight:700; letter-spacing:1px; pointer-events:auto; display:flex; align-items:center; justify-content:center; }
+  #btnWinch.active { background:rgba(255,200,80,.5); color:#221a05; }
+
+  /* ---------- Start overlay ---------- */
+  #start { position:fixed; inset:0; background:radial-gradient(ellipse at 50% 35%, #14304f 0%, #081222 70%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:10; color:#eaf4ff;
+    text-align:center; padding:24px; }
+  #start h1 { font-size:clamp(28px,7vw,44px); letter-spacing:2px; color:#ffd76a; text-shadow:0 3px 12px rgba(0,0,0,.6); }
+  #start p { max-width:520px; font-size:14px; line-height:1.7; opacity:.85; }
+  #start button { margin-top:10px; font-size:18px; font-weight:700; letter-spacing:1px; padding:14px 44px; border-radius:30px;
+    border:none; background:linear-gradient(180deg,#ffd76a,#f5a623); color:#3a2600; box-shadow:0 6px 20px rgba(245,166,35,.4); }
+  #start small { opacity:.55; font-size:11px; }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="topbar" class="panel">
+    <span>RESCUED <b id="score">0</b></span>
+    <span>ABOARD <b id="aboard">0</b>/6</span>
+    <span>LOST <b id="lost">0</b></span>
+  </div>
+  <div id="gauges" class="panel">
+    FUEL<div class="bar" id="fuelbar"><i style="width:100%"></i></div>
+    HULL<div class="bar" id="hullbar"><i style="width:100%"></i></div>
+    <div id="windrow"><span id="windarrow">➤</span><span id="windspd">0 m/s</span></div>
+    <div id="alt">ALT 0 m</div>
+  </div>
+  <div id="msg" class="panel"></div>
+  <div id="objective" class="panel">Fly to the ⚠ markers — hover &amp; lower the winch to rescue</div>
+</div>
+
+<div id="stickL" class="stick"><span class="lbl">MOVE</span><div class="nub"></div></div>
+<div id="stickR" class="stick"><span class="lbl">CLIMB / TURN</span><div class="nub"></div></div>
+<button id="btnWinch">WINCH</button>
+
+<div id="start">
+  <h1>TOWER RESCUE</h1>
+  <p>Skyscrapers are burning, hikers are stranded on the peaks and sailors are adrift in a stormy sea.
+     You fly the rescue helicopter.<br><br>
+     <b>Left stick</b> — tilt &amp; move &nbsp;·&nbsp; <b>Right stick</b> — climb / descend &amp; turn<br>
+     <b>WINCH</b> — lower the hoist over survivors, then drop them at the hospital <b>H</b> pad.<br>
+     Land on the base pad to refuel &amp; repair. Mind the wind, the waves and the collapsing towers.<br>
+     <small>Keyboard: WASD move · Q/E turn · R/F climb · Space winch</small></p>
+  <button id="btnStart">TAKE OFF</button>
+  <small>low-poly · dynamic fire · collapsing buildings · ocean physics</small>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
