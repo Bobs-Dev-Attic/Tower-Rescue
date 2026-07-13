@@ -7,11 +7,11 @@ import { clamp, lerp } from './util.js';
 //   ground effect near surfaces, hard-impact damage and water ditching.
 
 const G = 9.81;
-const MAX_TILT = 0.42;          // rad
-const MAX_THRUST = 19;          // m/s^2 at full collective (hover ≈ 0.52)
-const HOVER_BIAS = 0.49;        // stick-neutral collective sinks gently
+const MAX_TILT = 0.42;          // rad, visual bank/pitch at full stick
+const MAX_THRUST = 19;          // m/s^2 ceiling on rotor lift
 const TILT_RESPONSE = 3.2;      // attitude follows input with lag (inertia)
 const YAW_RATE = 1.9;
+const MOVE_ACCEL = 14;          // m/s^2 horizontal at full cyclic stick
 const DRAG_LIN = 0.12, DRAG_QUAD = 0.012;
 const CRASH_SPEED = 12;         // m/s vertical/total impact that hurts
 
@@ -42,14 +42,23 @@ function buildHeliMesh() {
     rotor.add(blade);
   }
   rotor.position.set(0, 1.45, 0);
+  // motion-blur disc: fades in as the rotor spools so the spin reads as fast
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(4.75, 24),
+    new THREE.MeshBasicMaterial({ color: 0x353b41, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.set(0, 1.5, 0);
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 0.7, 6), mat(0x2b2f33));
   mast.position.set(0, 1.15, 0);
   const tailRotor = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.0, 0.3), mat(0x2b2f33));
   tailRotor.position.set(0.45, 1.0, -5.8);
 
-  g.add(body, nose, tail, fin, skidL, skidR, strut1, strut2, mast, rotor, tailRotor);
+  g.add(body, nose, tail, fin, skidL, skidR, strut1, strut2, mast, rotor, disc, tailRotor);
   g.traverse((m) => { m.castShadow = true; });
+  disc.castShadow = false;
   g.userData.rotor = rotor;
+  g.userData.rotorDisc = disc;
   g.userData.tailRotor = tailRotor;
   return g;
 }
@@ -110,36 +119,47 @@ export class Helicopter {
     return new THREE.Vector3(this.pos.x, this.pos.y - 1.3 - this.ropeLen, this.pos.z);
   }
 
-  update(dt, input, events) {
+  update(dt, input, events, camYaw = Math.PI / 4) {
     if (this.crashed) return;
 
     // ----- rotor spool & fuel -----
     const wantSpin = this.fuel > 0 ? 1 : 0;
     this.rotorSpeed += clamp(wantSpin - this.rotorSpeed, -dt * 0.3, dt * 0.5);
     const rotor = this.mesh.userData.rotor;
-    rotor.rotation.y += dt * 40 * this.rotorSpeed;
-    this.mesh.userData.tailRotor.rotation.x += dt * 55 * this.rotorSpeed;
+    rotor.rotation.y += dt * 75 * this.rotorSpeed;
+    this.mesh.userData.rotorDisc.material.opacity = this.rotorSpeed * 0.4;
+    this.mesh.userData.tailRotor.rotation.x += dt * 90 * this.rotorSpeed;
     this.fuel = Math.max(0, this.fuel - dt * (0.0022 + 0.004 * Math.abs(input.collective)));
 
-    // ----- attitude with inertia -----
-    const tgtPitch = -input.cyclicY * MAX_TILT;
-    const tgtRoll = -input.cyclicX * MAX_TILT;
+    // ----- camera-relative cyclic: stick-up moves up-screen -----
+    // screen-right on the ground = (sin A, 0, -cos A); screen-up = (-cos A, 0, -sin A)
+    const ca = Math.cos(camYaw), sa = Math.sin(camYaw);
+    const mx = input.cyclicX * sa - input.cyclicY * ca;
+    const mz = -input.cyclicX * ca - input.cyclicY * sa;
+
+    // ----- attitude with inertia (visual: tilt into the acceleration) -----
+    const fwdAmt = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw);
+    const rightAmt = mx * Math.cos(this.yaw) - mz * Math.sin(this.yaw);
+    const tgtPitch = -fwdAmt * MAX_TILT;
+    const tgtRoll = -rightAmt * MAX_TILT;
     this.pitch += (tgtPitch - this.pitch) * TILT_RESPONSE * dt;
     this.roll += (tgtRoll - this.roll) * TILT_RESPONSE * dt;
     this.yaw -= input.yaw * YAW_RATE * dt;
 
     // ----- forces -----
-    const collective = clamp(HOVER_BIAS + input.collective * 0.48, 0, 1);
-    const thrust = collective * MAX_THRUST * this.rotorSpeed * lerp(0.7, 1, this.hull);
+    // Collective commands a climb/sink rate; the rotor works to hold it.
+    // Max sink (8 m/s) stays under the crash threshold so full-down is a
+    // firm landing, not a wreck. Updrafts/wind still perturb the hold.
+    const vyGoal = (input.collective >= 0 ? input.collective * 11 : input.collective * 7.5) - 0.7;
+    const lift = clamp(G + (vyGoal - this.vel.y) * 2.2, 0, MAX_THRUST) *
+                 this.rotorSpeed * lerp(0.7, 1, this.hull);
 
-    // rotor axis = local up, tilted by pitch/roll, rotated by yaw
-    const up = new THREE.Vector3(
-      Math.sin(this.roll) * Math.cos(this.yaw) + Math.sin(this.pitch) * Math.sin(this.yaw),
-      Math.cos(this.pitch) * Math.cos(this.roll),
-      Math.sin(this.pitch) * Math.cos(this.yaw) - Math.sin(this.roll) * Math.sin(this.yaw)
-    ).normalize();
-
-    const acc = up.multiplyScalar(thrust);
+    const airborneFactor = this.landed ? 0.25 : 1; // skids grip when parked
+    const acc = new THREE.Vector3(
+      mx * MOVE_ACCEL * this.rotorSpeed * airborneFactor,
+      lift,
+      mz * MOVE_ACCEL * this.rotorSpeed * airborneFactor
+    );
     acc.y -= G;
 
     // wind & vertical air currents (boundary layer shelters a grounded heli)
@@ -153,7 +173,7 @@ export class Helicopter {
     // ground effect: extra lift within ~6 m of a surface
     const groundY = this._surfaceBelow();
     const agl = this.pos.y - groundY;
-    if (agl < 7 && thrust > 2 && input.collective > 0.05) acc.y += (1 - agl / 7) * 2.0;
+    if (agl < 7 && lift > 2 && input.collective > 0.05) acc.y += (1 - agl / 7) * 2.0;
 
     this.vel.addScaledVector(acc, dt);
     this.pos.addScaledVector(this.vel, dt);
@@ -199,8 +219,8 @@ export class Helicopter {
         events.crash('Hard impact — the helicopter is destroyed!');
         return;
       }
-      if (impact > 4.5) {
-        this.hull = Math.max(0, this.hull - (impact - 4.5) * 0.06);
+      if (impact > 8) {
+        this.hull = Math.max(0, this.hull - (impact - 8) * 0.08);
         events.damage();
         if (this.hull <= 0) { events.crash('The airframe gave out!'); return; }
       }
