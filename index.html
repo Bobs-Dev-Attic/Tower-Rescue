@@ -34,6 +34,9 @@
     font-size:12px; opacity:.9; text-align:center; }
   #version { position:fixed; top:calc(env(safe-area-inset-top,0px) + 8px); right:8px; font-size:10px;
     letter-spacing:1px; color:rgba(200,225,255,.55); pointer-events:none; z-index:5; }
+  #instruments { position:fixed; bottom:calc(env(safe-area-inset-bottom,0px) + 6px); left:50%;
+    transform:translateX(-50%); width:min(400px, 48vw); pointer-events:none; z-index:4;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
 
   /* ---------- Touch controls ---------- */
   .stick { position:fixed; bottom:calc(env(safe-area-inset-bottom,0px) + 24px); width:124px; height:124px;
@@ -80,6 +83,7 @@
   <div id="objective" class="panel">Fly to the ⚠ markers — hover &amp; lower the winch to rescue</div>
 </div>
 
+<canvas id="instruments" width="400" height="84"></canvas>
 <div id="stickL" class="stick"><span class="lbl">MOVE</span><div class="nub"></div></div>
 <div id="stickR" class="stick"><span class="lbl">CLIMB / TURN</span><div class="nub"></div></div>
 <button id="btnWinch">WINCH</button>

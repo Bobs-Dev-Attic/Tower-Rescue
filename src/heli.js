@@ -138,9 +138,10 @@ export class Helicopter {
     const mz = -input.cyclicX * ca - input.cyclicY * sa;
 
     // ----- attitude with inertia (visual: tilt into the acceleration) -----
+    // positive rotateX = nose down, so accelerating toward the nose pitches forward
     const fwdAmt = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw);
     const rightAmt = mx * Math.cos(this.yaw) - mz * Math.sin(this.yaw);
-    const tgtPitch = -fwdAmt * MAX_TILT;
+    const tgtPitch = fwdAmt * MAX_TILT;
     const tgtRoll = -rightAmt * MAX_TILT;
     this.pitch += (tgtPitch - this.pitch) * TILT_RESPONSE * dt;
     this.roll += (tgtRoll - this.roll) * TILT_RESPONSE * dt;
