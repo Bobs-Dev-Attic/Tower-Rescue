@@ -135,7 +135,7 @@ export class Helicopter {
     return new THREE.Vector3(this.pos.x, this.pos.y - 1.3 - this.ropeLen, this.pos.z);
   }
 
-  update(dt, input, events, camYaw = Math.PI / 4) {
+  update(dt, input, events) {
     if (this.crashed) return;
 
     // ----- rotor spool & fuel -----
@@ -147,18 +147,18 @@ export class Helicopter {
     this.mesh.userData.tailRotor.rotation.x += dt * 90 * this.rotorSpeed;
     this.fuel = Math.max(0, this.fuel - dt * (0.0022 + 0.004 * Math.abs(input.collective)));
 
-    // ----- camera-relative cyclic: stick-up moves up-screen -----
-    // screen-right on the ground = (sin A, 0, -cos A); screen-up = (-cos A, 0, -sin A)
-    const ca = Math.cos(camYaw), sa = Math.sin(camYaw);
-    const mx = input.cyclicX * sa - input.cyclicY * ca;
-    const mz = -input.cyclicX * ca - input.cyclicY * sa;
+    // ----- body-relative cyclic, like a real helicopter -----
+    // stick-up flies toward the nose, stick-down backs up, left/right strafe.
+    // nose direction = (sin yaw, 0, cos yaw); right = (-cos yaw, 0, sin yaw)
+    const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
+    const mx = sy * input.cyclicY - cy * input.cyclicX;
+    const mz = cy * input.cyclicY + sy * input.cyclicX;
 
-    // ----- attitude with inertia (visual: tilt into the acceleration) -----
-    // positive rotateX = nose down, so accelerating toward the nose pitches forward
-    const fwdAmt = mx * Math.sin(this.yaw) + mz * Math.cos(this.yaw);
-    const rightAmt = mx * Math.cos(this.yaw) - mz * Math.sin(this.yaw);
-    const tgtPitch = fwdAmt * MAX_TILT;
-    const tgtRoll = -rightAmt * MAX_TILT;
+    // ----- attitude with inertia (tilt into the acceleration) -----
+    // positive rotateX = nose down / tail up, so forward stick dips the nose;
+    // positive rotateZ raises the left side, so right stick banks right.
+    const tgtPitch = input.cyclicY * MAX_TILT;
+    const tgtRoll = input.cyclicX * MAX_TILT;
     this.pitch += (tgtPitch - this.pitch) * TILT_RESPONSE * dt;
     this.roll += (tgtRoll - this.roll) * TILT_RESPONSE * dt;
     this.yaw -= input.yaw * YAW_RATE * dt;

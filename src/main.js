@@ -186,7 +186,7 @@ function frame(now) {
   if (!running) { renderer.render(scene, camera); return; }
 
   controls.update();
-  heli.update(dt, controls, events, ISO_YAW);
+  heli.update(dt, controls, events);
   world.update(dt);
   ocean.update(dt);
   weather.update(dt, camTarget, ocean);
