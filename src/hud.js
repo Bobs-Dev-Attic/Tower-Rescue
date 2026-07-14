@@ -1,7 +1,11 @@
-// Thin DOM layer: gauges, counters, wind indicator, timed messages.
+// Thin DOM layer: gauges, counters, wind indicator, timed messages,
+// plus the canvas cockpit instrument cluster (bottom-center).
+
+import { Instruments, FUEL_CAPACITY_LBS } from './instruments.js';
 
 export class HUD {
   constructor() {
+    this.instruments = new Instruments(document.getElementById('instruments'));
     this.score = document.getElementById('score');
     this.aboard = document.getElementById('aboard');
     this.lost = document.getElementById('lost');
@@ -32,6 +36,16 @@ export class HUD {
     this.windSpd.textContent = w.length().toFixed(0) + ' m/s' + (weather.rain > 0.3 ? ' 🌧' : '');
     const agl = heli.pos.y - heli.world.terrainHeight(heli.pos.x, heli.pos.z);
     this.alt.textContent = 'ALT ' + Math.max(0, agl).toFixed(0) + ' m';
+
+    // cockpit instruments: north is -z, so heading 0 = flying toward the mountains
+    this.instruments.update({
+      pitch: heli.pitch,
+      roll: heli.roll,
+      heading: Math.atan2(Math.sin(heli.yaw), -Math.cos(heli.yaw)),
+      alt: Math.max(0, agl),
+      speed: Math.hypot(heli.vel.x, heli.vel.z),
+      fuelLbs: heli.fuel * FUEL_CAPACITY_LBS,
+    });
 
     if (this._msgTimer > 0) {
       this._msgTimer -= dt;
