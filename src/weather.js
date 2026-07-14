@@ -37,8 +37,8 @@ export class Weather {
 
   // Horizontal wind (world-space) at a position; strength rises with altitude.
   windAt(pos, out = new THREE.Vector3()) {
-    const altBoost = 1 + clamp(pos.y / 120, 0, 1) * 0.8;
-    const gust = 1 + 0.5 * (noise2(this.time * 0.35, pos.x * 0.01 + pos.z * 0.01) - 0.5) * 2;
+    const altBoost = 1 + clamp(pos.y / 120, 0, 1) * 0.45;
+    const gust = 1 + 0.25 * (noise2(this.time * 0.35, pos.x * 0.01 + pos.z * 0.01) - 0.5) * 2;
     return out.copy(this.wind).multiplyScalar(altBoost * gust);
   }
 
@@ -55,7 +55,7 @@ export class Weather {
     const slopeAlong = (hW - h0) / e; // >0 means terrain rises downwind of us -> lift here
     if (h0 > 4 && pos.y - h0 < 60) up += clamp(slopeAlong * this.wind.length() * 1.6, -6, 9);
     // storm downdrafts / turbulence
-    up += (noise2(pos.x * 0.02 + this.time * 0.3, pos.z * 0.02) - 0.5) * (2 + this.rain * 8);
+    up += (noise2(pos.x * 0.02 + this.time * 0.3, pos.z * 0.02) - 0.5) * (1.2 + this.rain * 5);
     return up;
   }
 
@@ -64,7 +64,7 @@ export class Weather {
 
     // Slowly wandering wind direction & speed; storms mean stronger wind.
     const dirN = noise2(this.time * 0.02, 7.3) * Math.PI * 4;
-    const spd = 2 + noise2(this.time * 0.05, 91.2) * 7 + this.rain * 6;
+    const spd = 1.5 + noise2(this.time * 0.05, 91.2) * 4 + this.rain * 3.5;
     this.wind.set(Math.cos(dirN) * spd, 0, Math.sin(dirN) * spd);
 
     // Weather cycle: flip between clear and rain every 20-60 s.
