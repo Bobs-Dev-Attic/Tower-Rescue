@@ -109,28 +109,31 @@ export class World {
   }
 
   _buildProps(rand) {
-    // low-poly trees on the hills & mountain foot
-    const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 3, 5);
-    const crownGeo = new THREE.ConeGeometry(2.6, 6, 6);
-    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2b, flatShading: true });
-    const crownMat = new THREE.MeshLambertMaterial({ color: 0x2f6b33, flatShading: true });
-    const trees = new THREE.Group();
-    let placed = 0, tries = 0;
-    while (placed < 90 && tries++ < 600) {
+    // low-poly trees, instanced: 2 draw calls total instead of ~180 meshes
+    const spots = [];
+    let tries = 0;
+    while (spots.length < 90 && tries++ < 600) {
       const x = (rand() - 0.5) * 640, z = (rand() - 0.5) * 640;
       const h = terrainHeight(x, z);
       if (h < 2 || h > 34) continue;
       if (x > CITY.x0 - 10 && x < CITY.x1 + 10 && z > CITY.z0 - 10 && z < CITY.z1 + 10) continue;
-      const t = new THREE.Mesh(trunkGeo, trunkMat);
-      const cr = new THREE.Mesh(crownGeo, crownMat);
-      t.position.set(x, h + 1.5, z);
-      cr.position.set(x, h + 6, z);
-      const s = 0.7 + rand() * 0.9;
-      t.scale.setScalar(s); cr.scale.setScalar(s);
-      trees.add(t, cr);
-      placed++;
+      spots.push({ x, z, h, s: 0.7 + rand() * 0.9 });
     }
-    this.scene.add(trees);
+    const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 3, 5);
+    const crownGeo = new THREE.ConeGeometry(2.6, 6, 6);
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2b, flatShading: true });
+    const crownMat = new THREE.MeshLambertMaterial({ color: 0x2f6b33, flatShading: true });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
+    const crowns = new THREE.InstancedMesh(crownGeo, crownMat, spots.length);
+    const m = new THREE.Matrix4();
+    spots.forEach((p, i) => {
+      m.makeScale(p.s, p.s, p.s).setPosition(p.x, p.h + 1.5 * p.s, p.z);
+      trunks.setMatrixAt(i, m);
+      m.makeScale(p.s, p.s, p.s).setPosition(p.x, p.h + 6 * p.s, p.z);
+      crowns.setMatrixAt(i, m);
+    });
+    trunks.castShadow = crowns.castShadow = true;
+    this.scene.add(trunks, crowns);
   }
 
   _padMesh(color, letter) {
@@ -235,8 +238,7 @@ export class World {
     }
     // dust cloud reusing the fire particle system (grey, short lived)
     const dust = this.fires.spawn(new THREE.Vector3(b.x, b.baseY + 2, b.z),
-      { radius: Math.max(b.w, b.d) * 0.9, count: 50 });
-    dust.light.intensity = 0;
+      { radius: Math.max(b.w, b.d) * 0.9, count: 50, light: false });
     setTimeout(() => dust.extinguish(), 2500);
   }
 

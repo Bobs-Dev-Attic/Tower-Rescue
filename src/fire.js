@@ -20,13 +20,15 @@ function makeGlowTexture() {
 let glowTex = null;
 
 export class FireEmitter {
-  constructor(scene, position, { radius = 3, count = 70, smoke = true } = {}) {
+  constructor(scene, position, { radius = 3, count = 70, smoke = true, light = true } = {}) {
     glowTex ||= makeGlowTexture();
     this.position = position.clone();
     this.radius = radius;
     this.intensity = 1;      // 0..1, weather rain reduces it
     this.alive = true;
     this.count = count;
+    this.wantsLight = light;
+    this.lightIntensity = 0; // sampled by the FireSystem's shared light pool
 
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
@@ -56,10 +58,6 @@ export class FireEmitter {
     this.points = new THREE.Points(geo, mat);
     this.points.frustumCulled = false;
     scene.add(this.points);
-
-    this.light = new THREE.PointLight(0xff7722, 12, 40, 1.8);
-    this.light.position.copy(position).add(new THREE.Vector3(0, 2, 0));
-    scene.add(this.light);
     this._flicker = Math.random() * 10;
   }
 
@@ -120,15 +118,15 @@ export class FireEmitter {
     colAttr.needsUpdate = true;
 
     this._flicker += dt * 14;
-    this.light.intensity = this.alive
+    this.lightIntensity = this.alive && this.wantsLight
       ? (9 + Math.sin(this._flicker) * 3 + Math.sin(this._flicker * 2.7) * 2) * inten
-      : Math.max(0, this.light.intensity - dt * 8);
+      : Math.max(0, this.lightIntensity - dt * 8);
   }
 
   extinguish() { this.alive = false; }
 
   dispose(scene) {
-    scene.remove(this.points, this.light);
+    scene.remove(this.points);
     this.points.geometry.dispose();
   }
 }
@@ -137,16 +135,38 @@ export class FireSystem {
   constructor(scene) {
     this.scene = scene;
     this.emitters = [];
+    // Fixed pool of point lights shared by all fires: bounded lighting cost
+    // and a constant light count, so shaders compile once (no ignition hitch).
+    this.lights = Array.from({ length: 3 }, () => {
+      const l = new THREE.PointLight(0xff7722, 0, 40, 1.8);
+      scene.add(l);
+      return l;
+    });
   }
   spawn(position, opts) {
     const e = new FireEmitter(this.scene, position, opts);
     this.emitters.push(e);
     return e;
   }
-  update(dt, wind, rainFactor) {
+  update(dt, wind, rainFactor, focus) {
     for (const e of this.emitters) {
       if (e.alive) e.intensity = Math.max(0.25, 1 - rainFactor * 0.6);
       e.update(dt, wind);
+    }
+    // hand the pool lights to the brightest fires nearest the camera focus
+    const glowing = this.emitters.filter((e) => e.lightIntensity > 0.05);
+    if (focus) {
+      glowing.sort((a, b) =>
+        a.position.distanceToSquared(focus) - b.position.distanceToSquared(focus));
+    }
+    for (let i = 0; i < this.lights.length; i++) {
+      const l = this.lights[i], e = glowing[i];
+      if (e) {
+        l.position.set(e.position.x, e.position.y + 2, e.position.z);
+        l.intensity = e.lightIntensity;
+      } else {
+        l.intensity = 0;
+      }
     }
   }
   // Total heat near a point -> thermal updraft strength for the weather system.

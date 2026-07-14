@@ -98,8 +98,23 @@ export class Helicopter {
     );
     scene.add(this.hook);
 
+    // cheap blob shadow, shown only when the quality manager disables shadow maps
+    this._blob = new THREE.Mesh(
+      new THREE.CircleGeometry(3.4, 16),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false })
+    );
+    this._blob.rotation.x = -Math.PI / 2;
+    this._blob.visible = false;
+    this._blobEnabled = false;
+    scene.add(this._blob);
+
     this.resetAtBase();
     this._wind = new THREE.Vector3();
+  }
+
+  setBlobShadow(on) {
+    this._blobEnabled = on;
+    this._blob.visible = on && !this.crashed;
   }
 
   resetAtBase() {
@@ -113,6 +128,7 @@ export class Helicopter {
     this.aboard = 0;
     this.winchOut = false; this.ropeLen = 0; this.hookLoad = null;
     this.mesh.visible = true;
+    if (this._blob) this._blob.visible = this._blobEnabled;
   }
 
   get hookPos() {
@@ -191,6 +207,11 @@ export class Helicopter {
     this.mesh.rotateY(this.yaw);
     this.mesh.rotateX(this.pitch);
     this.mesh.rotateZ(this.roll);
+    if (this._blob.visible) {
+      this._blob.position.set(this.pos.x, groundY + 0.15, this.pos.z);
+      const shrink = clamp(1.3 - agl / 120, 0.5, 1.3);
+      this._blob.scale.setScalar(shrink);
+    }
   }
 
   _surfaceBelow() {
@@ -303,6 +324,7 @@ export class Helicopter {
   explode(fireSystem) {
     this.crashed = true;
     this.mesh.visible = false;
+    this._blob.visible = false;
     this.ropeLine.visible = this.hook.visible = false;
     const e = fireSystem.spawn(this.pos.clone(), { radius: 3, count: 90 });
     setTimeout(() => e.extinguish(), 2600);
