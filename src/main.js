@@ -15,7 +15,12 @@ document.getElementById('version').textContent = 'v' + VERSION;
 document.getElementById('startVersion').textContent = 'v' + VERSION;
 
 // ---------- renderer / scene ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+// MSAA only on low-DPI screens: high-DPI phones are already supersampled
+// by the pixel ratio and the extra fill-rate cost isn't worth it.
+const renderer = new THREE.WebGLRenderer({
+  antialias: window.devicePixelRatio <= 1,
+  powerPreference: 'high-performance',
+});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -119,6 +124,41 @@ function handlePads(dt) {
 // out-of-fuel autorotation warning
 let fuelWarned = false;
 
+// ---------- adaptive quality ----------
+// Watch the real frame rate and step down through tiers until it holds:
+//   0: full DPR + shadow maps   1: DPR 1.5 + shadows
+//   2: DPR 1.25, shadows -> blob shadow   3: DPR 1
+const quality = { tier: 0, acc: 0, frames: 0, warmup: 3 };
+const TIER_DPR = [Math.min(window.devicePixelRatio, 2), 1.5, 1.25, 1];
+
+function applyTier(t) {
+  quality.tier = t;
+  renderer.setPixelRatio(TIER_DPR[t]);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  const shadows = t < 2;
+  if (renderer.shadowMap.enabled !== shadows) {
+    renderer.shadowMap.enabled = shadows;
+    sun.castShadow = shadows;
+    scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
+    heli.setBlobShadow(!shadows);
+  }
+}
+
+function watchPerformance(dt) {
+  if (quality.warmup > 0) { quality.warmup -= dt; return; } // skip shader warmup
+  quality.acc += dt;
+  quality.frames++;
+  if (quality.acc >= 3) {                                    // evaluate every 3 s
+    const avg = quality.acc / quality.frames;
+    if (avg > 0.022 && quality.tier < TIER_DPR.length - 1) { // sustained < ~45 fps
+      applyTier(quality.tier + 1);
+      quality.warmup = 2;                                    // settle before re-judging
+    }
+    quality.acc = 0;
+    quality.frames = 0;
+  }
+}
+
 // ---------- resize ----------
 window.addEventListener('resize', () => {
   const a = window.innerWidth / window.innerHeight;
@@ -150,9 +190,10 @@ function frame(now) {
   world.update(dt);
   ocean.update(dt);
   weather.update(dt, camTarget, ocean);
-  fires.update(dt, weather.wind, weather.rain);
+  fires.update(dt, weather.wind, weather.rain, camTarget);
   survivors.update(dt);
   handlePads(dt);
+  watchPerformance(dt);
 
   if (heli.fuel <= 0 && !fuelWarned) {
     fuelWarned = true;
@@ -188,4 +229,5 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // debug/testing handle (harmless in production)
-window.__game = { heli, world, ocean, weather, survivors, fires, get rescued() { return rescued; } };
+window.__game = { heli, world, ocean, weather, survivors, fires, quality, applyTier,
+  get rescued() { return rescued; } };

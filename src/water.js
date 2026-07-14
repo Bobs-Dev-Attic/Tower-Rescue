@@ -1,8 +1,11 @@
 import * as THREE from '../vendor/three.module.js';
 
-// Ocean: CPU-displaced grid using a sum of Gerstner waves.
-// waveHeight(x, z) is the same math, so rafts / swimmers / the helicopter
-// interact with the exact surface that is rendered.
+// Ocean: Gerstner waves displaced on the GPU (vertex shader), so the CPU
+// pays nothing per-vertex. waveHeight(x, z) evaluates the SAME wave sum
+// analytically at single points for physics/buoyancy, so rafts and the
+// helicopter interact with exactly the surface that is rendered.
+// flatShading derives normals from screen-space derivatives in the fragment
+// shader, so displaced vertices light correctly with no normal recompute.
 
 const WAVES = [
   // dirX, dirZ, amplitude, wavelength, speed
@@ -11,6 +14,21 @@ const WAVES = [
   [-0.2, 1.0, 0.32, 15, 3.1],
   [0.9, -0.5, 0.18, 8, 2.4],
 ];
+
+// GLSL for the same wave sum (y displacement + Gerstner xz sharpening)
+function waveGLSL() {
+  let s = 'vec3 waveDisp(vec2 p){\n  vec3 d = vec3(0.0);\n  float k, ph, a;\n  vec2 dir;\n';
+  for (const [dx, dz, amp, len, spd] of WAVES) {
+    const il = 1 / Math.hypot(dx, dz);
+    s += `  dir = vec2(${(dx * il).toFixed(5)}, ${(dz * il).toFixed(5)});\n`;
+    s += `  k = ${((Math.PI * 2) / len).toFixed(6)};\n`;
+    s += `  ph = dot(p, dir) * k + uTime * ${(spd * ((Math.PI * 2) / len)).toFixed(6)};\n`;
+    s += `  a = ${amp} * uStorm;\n`;
+    s += '  d.y += a * sin(ph);\n  d.xz += 0.35 * a * dir * cos(ph);\n';
+  }
+  s += '  return d;\n}\n';
+  return s;
+}
 
 export class Ocean {
   constructor(scene, { level = 0, size = 900, segments = 96, shoreX = -145 } = {}) {
@@ -21,9 +39,9 @@ export class Ocean {
 
     const geo = new THREE.PlaneGeometry(size, size, segments, segments);
     geo.rotateX(-Math.PI / 2);
-    this.geo = geo;
-    this.basePos = geo.attributes.position.array.slice();
 
+    this.uTime = { value: 0 };
+    this.uStorm = { value: 1 };
     const mat = new THREE.MeshPhongMaterial({
       color: 0x1a5f8a,
       emissive: 0x06283d,
@@ -33,6 +51,18 @@ export class Ocean {
       transparent: true,
       opacity: 0.92,
     });
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = this.uTime;
+      shader.uniforms.uStorm = this.uStorm;
+      shader.vertexShader =
+        'uniform float uTime;\nuniform float uStorm;\n' + waveGLSL() +
+        shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          vec2 wavePos = (modelMatrix * vec4(position, 1.0)).xz;
+          transformed += waveDisp(wavePos);`
+        );
+    };
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.position.y = level;
     this.mesh.receiveShadow = true;
@@ -55,30 +85,7 @@ export class Ocean {
 
   update(dt) {
     this.time += dt;
-    const pos = this.geo.attributes.position;
-    const base = this.basePos;
-    const t = this.time, s = this.storm;
-    const ox = this.mesh.position.x, oz = this.mesh.position.z;
-    for (let i = 0; i < pos.count; i++) {
-      const bx = base[i * 3], bz = base[i * 3 + 2];
-      const wx = bx + ox, wz = bz + oz;
-      let y = 0, sx = 0, sz = 0;
-      for (const [dx, dz, amp, len, spd] of WAVES) {
-        const il = 1 / Math.hypot(dx, dz);
-        const k = (Math.PI * 2) / len;
-        const ph = (wx * dx + wz * dz) * il * k + t * spd * k;
-        const a = amp * s;
-        y += a * Math.sin(ph);
-        // Gerstner horizontal displacement -> sharper crests
-        const q = 0.35 * a;
-        sx += q * dx * il * Math.cos(ph);
-        sz += q * dz * il * Math.cos(ph);
-      }
-      pos.array[i * 3] = bx + sx;
-      pos.array[i * 3 + 1] = y;
-      pos.array[i * 3 + 2] = bz + sz;
-    }
-    pos.needsUpdate = true;
-    this.geo.computeVertexNormals();
+    this.uTime.value = this.time;
+    this.uStorm.value = this.storm;
   }
 }
