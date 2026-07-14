@@ -29,6 +29,7 @@ Hover over a survivor, lower the **winch**, reel them in, then land on the red *
 
 - **Flight physics** — rotor thrust along the tilted rotor axis, attitude inertia, quadratic drag, ground effect, rotor spool-up, fuel burn, hull damage and hard-impact crashes.
 - **Weather** — a wandering wind field with altitude boost and gusts, rain fronts that roll in and out, thermal **updrafts above fires**, orographic lift on windward mountain slopes, and storm downdrafts.
+- **Adjustable realism** — a ⚙ settings panel with live sliders for **wind strength**, **gusts & turbulence** and **thermals & updrafts**, plus Calm / Realistic / Extreme presets. Changes apply instantly and are saved to `localStorage`.
 - **Fire** — pooled particle fire + smoke with flickering point lights; fire spreads through building floors, is damped by rain, and feeds the thermal updraft field.
 - **Collapsing buildings** — burning towers lose structural integrity, shake, then collapse into tumbling debris with bounce physics and a dust cloud. Anyone still on the roof is lost.
 - **Ocean** — a sum-of-Gerstner-waves surface displaced on the CPU; the *same* analytic wave function drives rendering, raft buoyancy/tilt and helicopter ditching, and storms raise the sea state.
@@ -50,6 +51,8 @@ src/heli.js       flight model, collisions, winch
 src/world.js      terrain, city, collapse & debris physics, helipads
 src/water.js      Gerstner-wave ocean + buoyancy sampling
 src/weather.js    wind / gusts / rain / updraft field
+src/settings.js   adjustable realism multipliers (+ presets, persistence)
+src/settingsPanel.js  wires the ⚙ settings panel to the realism knobs
 src/fire.js       particle fire & smoke system
 src/survivors.js  rescue targets & their habitats
 src/controls.js   dual virtual joysticks + keyboard

@@ -61,6 +61,31 @@
   #start button { margin-top:10px; font-size:18px; font-weight:700; letter-spacing:1px; padding:14px 44px; border-radius:30px;
     border:none; background:linear-gradient(180deg,#ffd76a,#f5a623); color:#3a2600; box-shadow:0 6px 20px rgba(245,166,35,.4); }
   #start small { opacity:.55; font-size:11px; }
+
+  /* ---------- Settings ---------- */
+  #btnSettings { position:fixed; top:calc(env(safe-area-inset-top,0px) + 26px); right:8px; z-index:6;
+    width:34px; height:34px; border-radius:9px; background:rgba(8,18,32,.55); color:#cfe4ff;
+    border:1px solid rgba(140,190,255,.35); backdrop-filter:blur(4px); font-size:17px; line-height:1;
+    pointer-events:auto; display:flex; align-items:center; justify-content:center; }
+  #settings { position:fixed; inset:0; z-index:11; display:none; align-items:center; justify-content:center;
+    background:rgba(4,10,20,.72); backdrop-filter:blur(3px); padding:20px; }
+  #settings.open { display:flex; }
+  #settingsCard { width:min(420px,100%); background:linear-gradient(180deg,#122844,#0b1a2e);
+    border:1px solid rgba(140,190,255,.3); border-radius:16px; padding:20px 22px; color:#eaf4ff;
+    box-shadow:0 12px 40px rgba(0,0,0,.55); }
+  #settingsCard h2 { font-size:19px; letter-spacing:1px; color:#ffd76a; margin-bottom:4px; }
+  #settingsCard .sub { font-size:12px; opacity:.7; margin-bottom:16px; }
+  .presets { display:flex; gap:8px; margin-bottom:18px; }
+  .presets button { flex:1; padding:9px 0; border-radius:9px; border:1px solid rgba(140,190,255,.3);
+    background:rgba(120,170,255,.1); color:#dcecff; font-size:12px; font-weight:700; letter-spacing:.5px; }
+  .presets button.active { background:linear-gradient(180deg,#ffd76a,#f5a623); color:#3a2600; border-color:transparent; }
+  .opt { margin-bottom:16px; }
+  .opt label { display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-bottom:2px; }
+  .opt label span { color:#ffd76a; font-variant-numeric:tabular-nums; }
+  .opt .hint { font-size:11px; opacity:.6; margin-bottom:6px; }
+  .opt input[type=range] { width:100%; accent-color:#f5a623; height:22px; }
+  #settingsClose { width:100%; margin-top:6px; padding:12px 0; border:none; border-radius:12px;
+    background:linear-gradient(180deg,#ffd76a,#f5a623); color:#3a2600; font-size:15px; font-weight:700; letter-spacing:1px; }
 </style>
 </head>
 <body>
@@ -81,6 +106,36 @@
   </div>
   <div id="msg" class="panel"></div>
   <div id="objective" class="panel">Fly to the ⚠ markers — hover &amp; lower the winch to rescue</div>
+</div>
+
+<button id="btnSettings" title="Realism settings">⚙</button>
+
+<div id="settings">
+  <div id="settingsCard">
+    <h2>REALISM</h2>
+    <div class="sub">Tune how hard the elements fight you. Changes apply instantly and are saved.</div>
+    <div class="presets" id="presets">
+      <button data-preset="calm">Calm</button>
+      <button data-preset="realistic">Realistic</button>
+      <button data-preset="extreme">Extreme</button>
+    </div>
+    <div class="opt">
+      <label for="optWind">Wind strength <span id="optWindVal">100%</span></label>
+      <div class="hint">How hard the horizontal wind pushes the helicopter.</div>
+      <input type="range" id="optWind" min="0" max="2" step="0.05" value="1">
+    </div>
+    <div class="opt">
+      <label for="optGusts">Gusts &amp; turbulence <span id="optGustsVal">100%</span></label>
+      <div class="hint">Size of the sudden, unpredictable wind swings.</div>
+      <input type="range" id="optGusts" min="0" max="2" step="0.05" value="1">
+    </div>
+    <div class="opt">
+      <label for="optThermals">Thermals &amp; updrafts <span id="optThermalsVal">100%</span></label>
+      <div class="hint">Vertical air currents from fires, slopes and storms.</div>
+      <input type="range" id="optThermals" min="0" max="2" step="0.05" value="1">
+    </div>
+    <button id="settingsClose">DONE</button>
+  </div>
 </div>
 
 <canvas id="instruments" width="400" height="84"></canvas>

@@ -2,6 +2,7 @@
 // plus the canvas cockpit instrument cluster (bottom-center).
 
 import { Instruments, FUEL_CAPACITY_LBS } from './instruments.js';
+import { settings } from './settings.js';
 
 export class HUD {
   constructor() {
@@ -33,7 +34,7 @@ export class HUD {
     const w = weather.wind;
     const ang = Math.atan2(w.z, w.x) - camYaw;
     this.windArrow.style.transform = `rotate(${(ang * 180 / Math.PI).toFixed(0)}deg)`;
-    this.windSpd.textContent = w.length().toFixed(0) + ' m/s' + (weather.rain > 0.3 ? ' 🌧' : '');
+    this.windSpd.textContent = (w.length() * settings.wind).toFixed(0) + ' m/s' + (weather.rain > 0.3 ? ' 🌧' : '');
     const agl = heli.pos.y - heli.world.terrainHeight(heli.pos.x, heli.pos.z);
     this.alt.textContent = 'ALT ' + Math.max(0, agl).toFixed(0) + ' m';
 

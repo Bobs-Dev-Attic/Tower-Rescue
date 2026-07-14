@@ -1,5 +1,6 @@
 import * as THREE from '../vendor/three.module.js';
 import { noise2, clamp } from './util.js';
+import { settings } from './settings.js';
 
 // Wind, gusts, rain and the vertical air-current field.
 // windAt() and updraftAt() are sampled by the helicopter, fire smoke,
@@ -38,8 +39,8 @@ export class Weather {
   // Horizontal wind (world-space) at a position; strength rises with altitude.
   windAt(pos, out = new THREE.Vector3()) {
     const altBoost = 1 + clamp(pos.y / 120, 0, 1) * 0.45;
-    const gust = 1 + 0.25 * (noise2(this.time * 0.35, pos.x * 0.01 + pos.z * 0.01) - 0.5) * 2;
-    return out.copy(this.wind).multiplyScalar(altBoost * gust);
+    const gustDev = 0.25 * settings.gusts * (noise2(this.time * 0.35, pos.x * 0.01 + pos.z * 0.01) - 0.5) * 2;
+    return out.copy(this.wind).multiplyScalar(altBoost * (1 + gustDev) * settings.wind);
   }
 
   // Vertical air speed: fire thermals, mountain slope lift, sink over water in storms.
@@ -56,7 +57,7 @@ export class Weather {
     if (h0 > 4 && pos.y - h0 < 60) up += clamp(slopeAlong * this.wind.length() * 1.6, -6, 9);
     // storm downdrafts / turbulence
     up += (noise2(pos.x * 0.02 + this.time * 0.3, pos.z * 0.02) - 0.5) * (1.2 + this.rain * 5);
-    return up;
+    return up * settings.thermals;
   }
 
   update(dt, focus /* Vector3 camera target */, ocean) {

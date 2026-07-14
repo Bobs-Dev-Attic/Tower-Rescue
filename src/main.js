@@ -10,6 +10,9 @@ import { HUD } from './hud.js';
 import { RotorAudio } from './audio.js';
 import { clamp } from './util.js';
 import { VERSION } from './version.js';
+import { initSettingsPanel } from './settingsPanel.js';
+
+initSettingsPanel();
 
 document.getElementById('version').textContent = 'v' + VERSION;
 document.getElementById('startVersion').textContent = 'v' + VERSION;
